@@ -1,0 +1,28 @@
+name: Build EXE
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: pip install scapy pyqt5 pyinstaller
+
+    - name: Build EXE
+      run: pyinstaller --onefile --noconsole tool.py
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: lldp-tool
+        path: dist/tool.exe
