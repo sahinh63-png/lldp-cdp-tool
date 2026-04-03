@@ -10,12 +10,10 @@ seen = set()
 class App(QWidget):
     def __init__(self):
         super().__init__()
-
         self.setWindowTitle("LLDP/CDP PRO Discovery Tool")
         self.setGeometry(200, 200, 900, 500)
 
         layout = QVBoxLayout()
-
         self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["Switch", "IP", "Port", "VLAN", "Time"])
 
@@ -24,7 +22,6 @@ class App(QWidget):
 
         layout.addWidget(self.table)
         layout.addWidget(btn)
-
         self.setLayout(layout)
 
     def add_row(self, sw, ip, port, vlan):
@@ -37,7 +34,6 @@ class App(QWidget):
 
         row = self.table.rowCount()
         self.table.insertRow(row)
-
         self.table.setItem(row, 0, QTableWidgetItem(sw))
         self.table.setItem(row, 1, QTableWidgetItem(ip))
         self.table.setItem(row, 2, QTableWidgetItem(port))
@@ -48,14 +44,10 @@ class App(QWidget):
         path, _ = QFileDialog.getSaveFileName(self, "Save CSV", "", "CSV Files (*.csv)")
         if not path:
             return
-
         with open(path, "w") as f:
             f.write("Switch,IP,Port,VLAN,Time\n")
             for r in range(self.table.rowCount()):
-                row = []
-                for c in range(5):
-                    item = self.table.item(r, c)
-                    row.append(item.text() if item else "")
+                row = [self.table.item(r, c).text() if self.table.item(r, c) else "" for c in range(5)]
                 f.write(",".join(row) + "\n")
 
 
@@ -70,35 +62,23 @@ def parse_lldp(pkt):
     while i < len(data):
         if i + 2 > len(data):
             break
-
         tlv_header = struct.unpack("!H", data[i:i+2])[0]
         tlv_type = (tlv_header >> 9) & 0x7F
         tlv_len = tlv_header & 0x1FF
-
         value = data[i+2:i+2+tlv_len]
 
         if tlv_type == 5:
-            try:
-                switch = value.decode(errors="ignore")
-            except:
-                switch = str(value)
-
+            try: switch = value.decode(errors="ignore")
+            except: switch = str(value)
         elif tlv_type == 2:  # Port-ID
-            try:
-                port = value.decode(errors="ignore")
-            except:
-                port = str(value)
-
+            try: port = value.decode(errors="ignore")
+            except: port = str(value)
         elif tlv_type == 8:
-            try:
-                ip = ".".join(map(str, value[-4:]))
-            except:
-                pass
-
+            try: ip = ".".join(map(str, value[-4:]))
+            except: pass
         elif tlv_type == 127:
             if b"\x00\x80\xc2" in value:
                 vlan = str(int.from_bytes(value[-2:], "big"))
-
         i += 2 + tlv_len
 
     return switch, ip, port, vlan
@@ -116,32 +96,23 @@ def parse_cdp(pkt):
             idx = data.find(b"Device-ID") + len(b"Device-ID")
             switch_raw = data[idx:idx+20]
             switch = ''.join([chr(b) for b in switch_raw if 32 <= b <= 126])
-    except:
-        switch = "-"
-
+    except: switch = "-"
     try:
         if b"Port-ID" in data:
             idx = data.find(b"Port-ID") + len(b"Port-ID")
             port_raw = data[idx:idx+20]
             port = ''.join([chr(b) for b in port_raw if 32 <= b <= 126])
-    except:
-        port = "-"
-
-    # VLAN parsing (gerekirse güncelleyebilirsin)
+    except: port = "-"
     try:
         if b"\x0a\x00" in data:
             idx = data.find(b"\x0a\x00")
             vlan = str(int.from_bytes(data[idx+2:idx+4], "big"))
-    except:
-        vlan = "-"
-
-    # IP parsing (gerekirse güncelleyebilirsin)
+    except: vlan = "-"
     try:
         if b"\x01\x00" in data:
             idx = data.find(b"\x01\x00")
             ip = ".".join(map(str, data[idx+4:idx+8]))
-    except:
-        ip = "-"
+    except: ip = "-"
 
     return switch, ip, port, vlan
 
@@ -152,11 +123,9 @@ def sniff_thread(gui):
             if pkt.type == 0x88cc:  # LLDP
                 sw, ip, port, vlan = parse_lldp(pkt)
                 gui.add_row(sw, ip, port, vlan)
-
             elif pkt.type == 0x2000:  # CDP
                 sw, ip, port, vlan = parse_cdp(pkt)
                 gui.add_row(sw, ip, port, vlan)
-
     sniff(prn=handler, store=0)
 
 
