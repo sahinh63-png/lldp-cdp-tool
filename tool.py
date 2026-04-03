@@ -28,6 +28,8 @@ class App(QWidget):
         self.setLayout(layout)
 
     def add_row(self, sw, ip, port, vlan):
+        if not port:
+            port = "Unknown"
         key = (sw, ip, port, vlan)
         if key in seen:
             return
@@ -76,10 +78,16 @@ def parse_lldp(pkt):
         value = data[i+2:i+2+tlv_len]
 
         if tlv_type == 5:
-            switch = value.decode(errors="ignore")
+            try:
+                switch = value.decode(errors="ignore")
+            except:
+                switch = str(value)
 
-        elif tlv_type == 2:
-            port = value[1:].decode(errors="ignore")
+        elif tlv_type == 2:  # Port-ID
+            try:
+                port = value.decode(errors="ignore")
+            except:
+                port = str(value)
 
         elif tlv_type == 8:
             try:
@@ -103,25 +111,37 @@ def parse_cdp(pkt):
     vlan = "-"
     ip = "-"
 
-    if b"Device-ID" in data:
-        try:
-            switch = data.split(b"Device-ID")[1].split(b"\x00")[1].decode()
-        except:
-            pass
+    try:
+        if b"Device-ID" in data:
+            idx = data.find(b"Device-ID") + len(b"Device-ID")
+            switch_raw = data[idx:idx+20]
+            switch = ''.join([chr(b) for b in switch_raw if 32 <= b <= 126])
+    except:
+        switch = "-"
 
-    if b"Port-ID" in data:
-        try:
-            port = data.split(b"Port-ID")[1].split(b"\x00")[1].decode()
-        except:
-            pass
+    try:
+        if b"Port-ID" in data:
+            idx = data.find(b"Port-ID") + len(b"Port-ID")
+            port_raw = data[idx:idx+20]
+            port = ''.join([chr(b) for b in port_raw if 32 <= b <= 126])
+    except:
+        port = "-"
 
-    if b"\x0a\x00" in data:
-        idx = data.find(b"\x0a\x00")
-        vlan = str(int.from_bytes(data[idx+2:idx+4], "big"))
+    # VLAN parsing (gerekirse güncelleyebilirsin)
+    try:
+        if b"\x0a\x00" in data:
+            idx = data.find(b"\x0a\x00")
+            vlan = str(int.from_bytes(data[idx+2:idx+4], "big"))
+    except:
+        vlan = "-"
 
-    if b"\x01\x00" in data:
-        idx = data.find(b"\x01\x00")
-        ip = ".".join(map(str, data[idx+4:idx+8]))
+    # IP parsing (gerekirse güncelleyebilirsin)
+    try:
+        if b"\x01\x00" in data:
+            idx = data.find(b"\x01\x00")
+            ip = ".".join(map(str, data[idx+4:idx+8]))
+    except:
+        ip = "-"
 
     return switch, ip, port, vlan
 
